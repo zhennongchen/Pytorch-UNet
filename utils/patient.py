@@ -7,6 +7,9 @@ import logging
 import nibabel as nib
 import numpy as np
 import math
+from nibabel.affines import apply_affine
+import scipy.ndimage.measurements as meas
+from scipy import ndimage
 
 class Patient:
     def __init__(self, pat_file, data_device="cpu"):
@@ -62,3 +65,71 @@ class Patient:
         
         seg = nib.Nifti1Image(segdata, img.affine)
         nib.save(seg, seg_file)
+        
+class PatientSegmentation:
+    def __init__(self, seg_file, data_device="cpu"):
+        self.seg_file = seg_file
+        
+        self.dev = torch.device(data_device)
+
+    def __size__(self):
+        img = nib.load(self.seg_file)
+        
+        Nx,Ny,Nz = img.shape
+        
+        return Nx,Ny,Nz,img
+    
+    def coordinates(self,units="mm"):
+        Nx,Ny,Nz,img = self.__size__()
+        i = np.arange(0,Nx);
+        j = np.arange(0,Ny);
+        k = np.arange(0,Nz);
+        
+        ii,jj,kk = np.meshgrid(i,j,k)
+        ii = ii.reshape((Nx*Ny*Nz,1))
+        jj = jj.reshape((Nx*Ny*Nz,1))
+        kk = kk.reshape((Nx*Ny*Nz,1))
+        II = np.concatenate((ii,jj,kk),axis=1)
+        
+        XX = apply_affine(img.affine,II)
+        
+        x = XX[:,0].reshape((Nx,Ny,Nz))
+        y = XX[:,1].reshape((Nx,Ny,Nz))
+        z = XX[:,2].reshape((Nx,Ny,Nz))
+    
+        return x,y,z
+   
+    
+    def interpolateOnCoordinates(self,i,j,k):
+        Nx,Ny,Nz,img = self.__size__()
+        ii = np.arange(0,Nx);
+        jj = np.arange(0,Ny);
+        kk = np.arange(0,Nz);
+        
+        xx,yy,zz = self.coordinates()
+        xx = np.squeeze(xx[0,:,0])
+        yy = np.squeeze(yy[:,0,0])
+        zz = np.squeeze(zz[0,0,:])
+        
+        x = np.interp(i,ii,xx)
+        y = np.interp(j,jj,yy)
+        z = np.interp(k,kk,zz)
+        
+        return x,y,z
+    
+    def labelData(self):
+        seg = nib.load(self.seg_file)
+        segdata = seg.get_fdata()
+        segdata = segdata.astype(int)
+        lbls = np.unique(segdata)
+        return segdata, lbls
+        
+    def centerOfMass(self,label):
+        
+        
+        v,lbls = self.labelData()
+        
+        L = (v == label)*1.0
+        com = meas.center_of_mass(L)
+        comx = self.interpolateOnCoordinates(com[0],com[1],com[2])
+        return com, comx
