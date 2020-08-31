@@ -4,6 +4,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class SegmentationRegressionLoss(nn.Module):
+    
+    def __init__(self):
+        super(SegmentationRegressionLoss,self).__init__()
+    
+    def forward(self, labels, vector, target_labels, target_vector, weight):
+        CE = nn.CrossEntropyLoss()(labels,target_labels)
+        MSE = nn.MSELoss()(vector,target_vector)
+        L = (CE + weight*MSE).double()
+        
+        print("CE:  " + str(CE))
+        print("MSE: " + str(MSE))
+        print("L:   " + str(L))
+        
+        return L
 
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
@@ -76,3 +91,17 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
+    
+class MLP(nn.Module):
+    """(fully connected)"""
+    
+    def __init__(self, in_channels, out_channels, hidden_channels):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_channels,hidden_channels),
+            nn.ReLU(),
+            nn.Linear(hidden_channels,out_channels),
+        )
+
+    def forward(self, x):
+        return self.mlp(x)
