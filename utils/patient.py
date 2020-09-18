@@ -126,10 +126,31 @@ class PatientSegmentation:
         
     def centerOfMass(self,label):
         
-        
         v,lbls = self.labelData()
         
         L = (v == label)*1.0
         com = meas.center_of_mass(L)
         comx = self.interpolateOnCoordinates(com[0],com[1],com[2])
         return com, comx
+    
+    def extent(self,label,prc_shift=5):
+        
+        v,_ = self.labelData()
+        
+        L = (v == label)*1.0
+        
+        xx,yy,zz = self.coordinates()
+#         xmin = np.amin(xx[L==1])
+#         xmax = np.amax(xx[L==1])
+#         ymin = np.amin(yy[L==1])
+#         ymax = np.amax(yy[L==1])
+#         zmin = np.amin(zz[L==1])
+#         zmax = np.amax(zz[L==1])
+        
+        xmin = np.percentile(xx[L==1], prc_shift)
+        xmax = np.percentile(xx[L==1], 100-prc_shift)
+        ymin = np.percentile(yy[L==1], prc_shift)
+        ymax = np.percentile(yy[L==1], 100-prc_shift)
+        zmin = np.percentile(zz[L==1], prc_shift)
+        zmax = np.percentile(zz[L==1], 100-prc_shift)
+        return xmin,xmax,ymin,ymax,zmin,zmax

@@ -4,6 +4,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class SegmentationRegressionLoss(nn.Module):
+    
+    def __init__(self):
+        super(SegmentationRegressionLoss,self).__init__()
+    
+    def forward(self, labels, vector, target_labels, target_vector, weight):
+        CE = nn.CrossEntropyLoss()(labels,target_labels)
+        MSE = nn.MSELoss()(vector,target_vector)
+        L = (CE + weight*MSE).double()
+        
+        print("CE:  " + str(CE))
+        print("MSE: " + str(MSE))
+        print("L:   " + str(L))
+        
+        return L
 
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
@@ -23,7 +38,18 @@ class DoubleConv(nn.Module):
 
     def forward(self, x):
         return self.double_conv(x)
+    
+class SingleConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.single_conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
 
+    def forward(self, x):
+        return self.single_conv(x)
 
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
@@ -76,3 +102,94 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
+    
+class Identity(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+    def forward(self, x):
+        return x
+    
+    
+class Reducer(nn.Module):
+    def __init__(self,n_classes,n_reduce):
+        super(Reducer, self).__init__()
+        if not n_reduce:
+            self.reduce = Identity()
+        else:
+            modules = []
+            modules.append(SingleConv(n_classes, n_reduce[0]))
+#             modules.append(nn.BatchNorm2d(n_reduce[0]))
+#             modules.append(nn.ReLU(inplace=True))
+            modules.append(nn.MaxPool2d(2))
+            
+            if len(n_reduce) > 1:
+                for ind in range(len(n_reduce)-1):
+                    modules.append(SingleConv(n_reduce[ind],n_reduce[ind+1]))
+                    modules.append(nn.BatchNorm2d(n_reduce[ind+1]))
+                    modules.append(nn.ReLU(inplace=True))
+                    modules.append(nn.MaxPool2d(2))
+            
+            self.reduce = nn.Sequential(*modules)
+    
+    def forward(self, x):
+        return self.reduce(x)
+    
+class MLP(nn.Module):
+    """(fully connected)"""
+    
+    def __init__(self, in_channels, out_channels, hidden_channels):
+        super().__init__()
+        modules = []
+        modules.append(nn.Linear(in_channels,hidden_channels[0]))
+        modules.append(nn.ReLU())
+        
+        Nhidden = len(hidden_channels)
+        
+        if Nhidden > 1:
+            for hiddenInd in range(Nhidden-1):
+                modules.append(nn.Linear(hidden_channels[hiddenInd],hidden_channels[hiddenInd+1]))
+                modules.append(nn.ReLU())
+        
+        modules.append(nn.Linear(hidden_channels[-1],out_channels))
+        
+        self.mlp = nn.Sequential(*modules)
+
+    def forward(self, x):
+        return self.mlp(x)
+    
+# class MLP(nn.Module):
+#     """(fully connected)"""
+    
+#     def __init__(self, in_channels, out_channels, hidden_channels):
+#         super().__init__()
+#         self.mlp = nn.Sequential(
+#             nn.Linear(in_channels,hidden_channels),
+#             nn.ReLU(),
+#             nn.Linear(hidden_channels,out_channels),
+#         )
+
+#     def forward(self, x):
+#         return self.mlp(x)
+
+# class MLP(nn.Module):
+#     """(fully connected)"""
+    
+#     def __init__(self, in_channels, out_channels, hidden_channels):
+#         super().__init__()
+#         modules = []
+#         modules.append(nn.Linear(in_channels,hidden_channels[0]))
+#         modules.append(nn.ReLU())
+        
+#         Nhidden = len(hidden_channels)
+        
+#         if Nhidden > 1:
+#             for hiddenInd in range(Nhidden-1):
+#                 modules.append(nn.Linear(hidden_channels[hiddenInd],hidden_channels[hiddenInd+1]))
+#                 modules.append(nn.ReLU())
+        
+#         modules.append(nn.Linear(hidden_channels[-1],out_channels))
+        
+#         self.mlp = nn.Sequential(*modules)
+
+#     def forward(self, x):
+#         return self.mlp(x)
