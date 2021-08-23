@@ -1,0 +1,12 @@
+Pytorch is a simpler backend for model building.
+It uses "Modules" to build a model.
+for example, in CNN, it sequentially put modules like 2D convolution, activation, maxpooling to make the CNN.
+
+The scripts can be run in octomore if use GPU. 
+how to open the jupyter notebook in octomore: https://ljvmiranda921.github.io/notebook/2018/01/31/running-a-jupyter-notebook/
+
+In the folder unet:
+unet_parts.py defines all the modules
+unet_model.py puts the modules together for the model
+
+The lastest version of model training is train_full_model_spine.ipynb, which we should mainly focus on.
